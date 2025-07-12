@@ -191,20 +191,31 @@ class LLM(RetryMixin, DebugMixin):
         elif 'gemini' in self.config.model.lower() and self.config.safety_settings:
             kwargs['safety_settings'] = self.config.safety_settings
 
-        self._completion = partial(
-            litellm_completion,
-            model=self.config.model,
-            api_key=self.config.api_key.get_secret_value()
+        # Format model name for custom providers
+        model_name = self.config.model
+        completion_kwargs = {
+            'api_key': self.config.api_key.get_secret_value()
             if self.config.api_key
             else None,
-            base_url=self.config.base_url,
-            api_version=self.config.api_version,
-            custom_llm_provider=self.config.custom_llm_provider,
-            timeout=self.config.timeout,
-            top_p=self.config.top_p,
-            drop_params=self.config.drop_params,
-            seed=self.config.seed,
-            **kwargs,
+            'base_url': self.config.base_url,
+            'api_version': self.config.api_version,
+            'timeout': self.config.timeout,
+            'top_p': self.config.top_p,
+            'drop_params': self.config.drop_params,
+            'seed': self.config.seed,
+        }
+
+        # When using custom_llm_provider, format model based on provider type
+        if self.config.custom_llm_provider:
+            model_name = f"{self.config.custom_llm_provider}/{self.config.model}"
+        # Note: custom_llm_provider should not be passed to litellm when using provider/model format
+
+        completion_kwargs.update(kwargs)
+
+        self._completion = partial(
+            litellm_completion,
+            model=model_name,
+            **completion_kwargs,
         )
 
         self._completion_unwrapped = self._completion
